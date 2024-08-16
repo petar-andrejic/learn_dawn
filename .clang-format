@@ -1,0 +1,22 @@
+---
+BasedOnStyle: Chromium
+IncludeBlocks: Regroup
+IncludeCategories:
+  - Regex: ^<.*\.h>
+    Priority: 0
+    SortPriority: 2
+    CaseSensitive: true
+  - Regex: ^<.*\.hpp>
+    Priority: 0
+    SortPriority: 2
+    CaseSensitive: true
+  - Regex: ^<.*
+    Priority: 1
+    SortPriority: 1
+    CaseSensitive: true
+  - Regex: .*
+    Priority: 2
+    SortPriority: 3
+    CaseSensitive: true
+IndentWidth: 4
+SeparateDefinitionBlocks: Always
