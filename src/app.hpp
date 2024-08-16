@@ -5,8 +5,6 @@
 #include <GLFW/glfw3.h>
 #include <webgpu/webgpu_cpp.h>
 
-struct wgpuData {};
-
 struct App {
    private:
     gsl::final_action<void (*)()> cleanupGLFW;
@@ -16,11 +14,18 @@ struct App {
     wgpu::Instance instance;
     wgpu::Adapter adapter;
     wgpu::Surface surface;
+    wgpu::TextureFormat surfaceFormat = wgpu::TextureFormat::Undefined;
     wgpu::Device device;
     wgpu::Queue queue;
+    wgpu::ShaderModule shaderModule;
+    wgpu::RenderPipeline pipeline;
 
-    int width, height;
+    unsigned int width, height;
 
+    void createSurface();
+    void createWindow(int width, int height);
+    void initWebGPU();
+    void initGLFW();
     App(int width, int height);
 
     ~App();
@@ -28,13 +33,19 @@ struct App {
     void run();
 
    private:
-    wgpu::Instance createInstance();
+    void createInstance();
 
-    wgpu::Adapter requestAdapter();
+    void requestAdapter();
 
-    wgpu::Device requestDevice();
+    void requestDeviceAndQueue();
+
+    void createRenderPipeline();
+
+    void render(const wgpu::TextureView& targetView);
 
     void configureSurface();
+
+    void loadShaders();
 
     wgpu::TextureView getNextTextureView();
 };

@@ -1,7 +1,12 @@
+// ReSharper disable CppMemberFunctionMayBeConst
+// Promising const here is a bit misleading, since the wgpu classes obfuscate
+// their state due to the C api, and as such const mainly amounts to promising
+// their pointers don't change, which isn't always desirable
 #include "app.hpp"
 
 #include <climits>
 #include <cstdint>
+#include <fstream>
 #include <gsl/util>
 #include <iostream>
 #include <stdexcept>
@@ -14,12 +19,15 @@
 
 #include "debug.hpp"
 
-App::App(int width, int height)
-    : width(width), height(height), cleanupGLFW(&glfwTerminate) {
-    if (!glfwInit()) {
-        throw std::runtime_error("Failed to init GLFW");
+void App::createSurface() {
+    WGPUSurface m_surface = glfwGetWGPUSurface(instance.Get(), window.get());
+    if (!m_surface) {
+        throw std::runtime_error("Failed to get valid webGPU surface");
     }
-    glfwSetErrorCallback(&debug_callbacks::throwGLFW);
+    surface = wgpu::Surface::Acquire(m_surface);
+}
+
+void App::createWindow(const int width, const int height) {
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     glfwWindowHint(GLFW_RESIZABLE, false);
     window = std::shared_ptr<GLFWwindow>(
@@ -28,24 +36,73 @@ App::App(int width, int height)
     if (!window) {
         throw std::runtime_error("Failed to create window");
     }
+}
 
-    instance = createInstance();
-    WGPUSurface m_surface = glfwGetWGPUSurface(instance.Get(), window.get());
-    if (m_surface == nullptr) {
-        throw std::runtime_error("Failed to get valid webgpu surface");
+void App::initWebGPU() {
+    createInstance();
+    createSurface();
+    requestAdapter();
+    requestDeviceAndQueue();
+}
+
+void App::initGLFW() {
+    if (!glfwInit()) {
+        throw std::runtime_error("Failed to init GLFW");
     }
-    surface = wgpu::Surface::Acquire(m_surface);
-    adapter = requestAdapter();
-    device = requestDevice();
-    device.SetUncapturedErrorCallback(&debug_callbacks::uncapturedError,
-                                      nullptr);
-    device.SetDeviceLostCallback(&debug_callbacks::onDeviceLost, nullptr);
-    queue = device.GetQueue();
+    glfwSetErrorCallback(&debug_callbacks::throwGLFW);
+    createWindow(static_cast<int>(width), static_cast<int>(height));
+}
+
+App::App(const int width, const int height)
+    : cleanupGLFW(&glfwTerminate), width(width), height(height) {
+    initGLFW();
+    initWebGPU();
     configureSurface();
+    loadShaders();
+    createRenderPipeline();
 }
 
 App::~App() {
     surface.Unconfigure();
+}
+
+void App::render(const wgpu::TextureView& targetView) {
+    {
+        wgpu::CommandEncoder commandEncoder = device.CreateCommandEncoder();
+        {
+            wgpu::RenderPassColorAttachment attachment[1]{
+                wgpu::RenderPassColorAttachment{
+                    .view = targetView,
+                    .depthSlice = wgpu::kDepthSliceUndefined,
+                    .resolveTarget = nullptr,
+                    .loadOp = wgpu::LoadOp::Clear,
+                    .storeOp = wgpu::StoreOp::Store,
+                    .clearValue = wgpu::Color{0.9, 0.1, 0.2, 1.0},
+                },
+            };
+            wgpu::RenderPassDescriptor desc{
+                .colorAttachmentCount = 1,
+                .colorAttachments = attachment,
+                .depthStencilAttachment = nullptr,
+                .timestampWrites = nullptr,
+            };
+            wgpu::RenderPassEncoder renderPassEncoder =
+                commandEncoder.BeginRenderPass(&desc);
+            renderPassEncoder.SetPipeline(pipeline);
+            renderPassEncoder.Draw(3, 1, 0, 0);
+            renderPassEncoder.End();
+        }
+        {
+            wgpu::CommandBufferDescriptor desc{
+                .label = "Command buffer",
+            };
+            const wgpu::CommandBuffer buf = commandEncoder.Finish(&desc);
+            queue.Submit(1, &buf);
+        }
+    }
+
+    surface.Present();
+    device.Tick();
 }
 
 void App::run() {
@@ -54,54 +111,34 @@ void App::run() {
         wgpu::TextureView targetView = getNextTextureView();
         if (!targetView)
             continue;
-        {
-            wgpu::CommandEncoder commandEncoder = device.CreateCommandEncoder();
-            {
-                wgpu::RenderPassDescriptor desc{};
-                wgpu::RenderPassColorAttachment attachment[1]{
-                    wgpu::RenderPassColorAttachment{
-                        .view = targetView,
-                        .depthSlice = wgpu::kDepthSliceUndefined,
-                        .resolveTarget = nullptr,
-                        .loadOp = wgpu::LoadOp::Clear,
-                        .storeOp = wgpu::StoreOp::Store,
-                        .clearValue = wgpu::Color{0.9, 0.1, 0.2, 1.0},
-                    }};
-                desc.colorAttachments = attachment;
-                desc.colorAttachmentCount = 1;
-                desc.depthStencilAttachment = nullptr;
-                desc.timestampWrites = nullptr;
-                wgpu::RenderPassEncoder renderPassEncoder =
-                    commandEncoder.BeginRenderPass(&desc);
-                renderPassEncoder.End();
-            }
-            {
-                wgpu::CommandBufferDescriptor desc{};
-                desc.label = "Command buffer";
-                wgpu::CommandBuffer buf = commandEncoder.Finish(&desc);
-                queue.Submit(1, &buf);
-            }
-        }
-
-        surface.Present();
-        device.Tick();
+        render(targetView);
     }
 }
 
-wgpu::Instance App::createInstance() {
-    wgpu::InstanceDescriptor desc{};
-    desc.features.timedWaitAnyEnable =
-        true;  // so that we can wait on callbacks
-    return wgpu::CreateInstance(&desc);
+void
+// ReSharper disable once CppMemberFunctionMayBeStatic
+// There's no point doing this outside of the constructor
+App::createInstance() {  // NOLINT(*-convert-member-functions-to-static)
+    wgpu::InstanceDescriptor desc{
+        .features{
+            .timedWaitAnyEnable = true,
+        },
+    };
+    instance = wgpu::CreateInstance(&desc);
+    if (!instance) {
+        throw std::runtime_error("Failed to create webGPU instance.");
+    }
 }
 
-wgpu::Adapter App::requestAdapter() {
-    wgpu::RequestAdapterOptions opts{};
-    opts.forceFallbackAdapter = false;
-    opts.backendType = wgpu::BackendType::Vulkan;
-    opts.compatibleSurface = surface;
+void App::requestAdapter() {
+    wgpu::RequestAdapterOptions opts{
+        .compatibleSurface = surface,
+        .forceFallbackAdapter = false,
+    };
 
-    wgpu::Adapter adapter;
+    // ReSharper disable once CppParameterMayBeConst
+    // ReSharper disable once CppPassValueParameterByConstReference
+    // The signature needs to match that requested by wgpu
     auto callback = [](wgpu::RequestAdapterStatus status,
                        wgpu::Adapter _adapter, const char* message,
                        wgpu::Adapter* result) {
@@ -109,54 +146,79 @@ wgpu::Adapter App::requestAdapter() {
             std::cerr << "Failed to obtain adapter: " << std::endl;
             return;
         }
-        *result = _adapter;
+        *result = std::move(_adapter);
     };
 
-    instance.WaitAny(
-        instance.RequestAdapter(&opts, wgpu::CallbackMode::WaitAnyOnly,
-                                callback, &adapter),
-        UINT64_MAX);
-    if (adapter == nullptr) {
+    wgpu::Future future = instance.RequestAdapter(
+        &opts, wgpu::CallbackMode::WaitAnyOnly, callback, &adapter);
+    instance.WaitAny(future, UINT64_MAX);
+    if (!adapter) {
         throw std::runtime_error("Failed to create adapter. Check logs");
     }
-    return adapter;
 };
 
-wgpu::Device App::requestDevice() {
+void App::requestDeviceAndQueue() {
     wgpu::DeviceDescriptor desc{};
-    wgpu::Device device;
 
+    // ReSharper disable once CppParameterMayBeConst
+    // ReSharper disable once CppPassValueParameterByConstReference
+    // The signature needs to match that requested by wgpu
     auto callback = [](wgpu::RequestDeviceStatus status, wgpu::Device _device,
                        const char* message, wgpu::Device* result) {
         if (status != wgpu::RequestDeviceStatus::Success) {
             std::cerr << "Failed to obtain device: " << std::endl;
             return;
         }
-        *result = _device;
+        *result = std::move(_device);
     };
-    auto future = adapter.RequestDevice(&desc, wgpu::CallbackMode::WaitAnyOnly,
-                                        callback, &device);
+
+    wgpu::Future future = adapter.RequestDevice(
+        &desc, wgpu::CallbackMode::WaitAnyOnly, callback, &device);
     instance.WaitAny(future, UINT64_MAX);
-    if (device == nullptr) {
+    if (!device) {
         throw std::runtime_error("Failed to create device. Check logs");
     }
-    return device;
+    device.SetUncapturedErrorCallback(&debug_callbacks::uncapturedError,
+                                      nullptr);
+    device.SetDeviceLostCallback(&debug_callbacks::onDeviceLost, nullptr);
+    queue = device.GetQueue();
+    if (!queue) {
+        throw std::runtime_error("Failed to create queue. Check logs");
+    };
 }
 
 void App::configureSurface() {
     wgpu::SurfaceCapabilities capabilities;
     surface.GetCapabilities(adapter, &capabilities);
-    wgpu::SurfaceConfiguration config{};
-    config.width = width;
-    config.height = height;
-    config.format = capabilities.formats[0];
-    config.viewFormatCount = 0;
-    config.viewFormats = nullptr;
-    config.usage = wgpu::TextureUsage::RenderAttachment;
-    config.device = device;
-    config.presentMode = wgpu::PresentMode::Fifo;
-    config.alphaMode = wgpu::CompositeAlphaMode::Auto;
+    surfaceFormat = capabilities.formats[0];
+    wgpu::SurfaceConfiguration config{
+        .device = device,
+        .format = surfaceFormat,
+        .usage = wgpu::TextureUsage::RenderAttachment,
+        .viewFormatCount = 0,
+        .viewFormats = nullptr,
+        .alphaMode = wgpu::CompositeAlphaMode::Auto,
+        .width = width,
+        .height = height,
+        .presentMode = wgpu::PresentMode::Fifo,
+    };
     surface.Configure(&config);
+}
+
+void App::loadShaders() {
+    std::string tmp, shaderSource;
+    std::ifstream file("./shaders/shader.wgsl");
+    while (std::getline(file, tmp)) {
+        shaderSource += tmp + "\n";
+    }
+    wgpu::ShaderModuleWGSLDescriptor wgsl_desc({
+        .code = shaderSource.c_str(),
+    });
+    wgpu::ShaderModuleDescriptor sm_desc{
+        .nextInChain = &wgsl_desc,
+    };
+
+    shaderModule = device.CreateShaderModule(&sm_desc);
 }
 
 wgpu::TextureView App::getNextTextureView() {
@@ -166,14 +228,74 @@ wgpu::TextureView App::getNextTextureView() {
         return nullptr;
     }
 
-    wgpu::TextureViewDescriptor desc{};
-    desc.label = "Surface texture view";
-    desc.format = tex.texture.GetFormat();
-    desc.dimension = wgpu::TextureViewDimension::e2D;
-    desc.baseMipLevel = 0;
-    desc.mipLevelCount = 1;
-    desc.baseArrayLayer = 0;
-    desc.arrayLayerCount = 1;
-    desc.aspect = wgpu::TextureAspect::All;
+    wgpu::TextureViewDescriptor desc{
+        .label = "Surface texture view",
+        .format = tex.texture.GetFormat(),
+        .dimension = wgpu::TextureViewDimension::e2D,
+        .baseMipLevel = 0,
+        .mipLevelCount = 1,
+        .baseArrayLayer = 0,
+        .arrayLayerCount = 1,
+        .aspect = wgpu::TextureAspect::All,
+    };
     return tex.texture.CreateView(&desc);
+}
+
+void App::createRenderPipeline() {
+    wgpu::VertexState vs{
+        .module = shaderModule,
+        .entryPoint = "vs_main",
+        .constantCount = 0,
+        .constants = nullptr,
+        .bufferCount = 0,
+        .buffers = nullptr,
+    };
+
+    wgpu::PrimitiveState ps{
+        .topology = wgpu::PrimitiveTopology::TriangleList,
+        .stripIndexFormat = wgpu::IndexFormat::Undefined,
+        .frontFace = wgpu::FrontFace::CCW,
+        .cullMode = wgpu::CullMode::None,
+    };
+
+    wgpu::BlendState bs{
+        .color{
+            .operation = wgpu::BlendOperation::Add,
+            .srcFactor = wgpu::BlendFactor::SrcAlpha,
+            .dstFactor = wgpu::BlendFactor::OneMinusSrcAlpha,
+        },
+        .alpha{
+            .operation = wgpu::BlendOperation::Add,
+            .srcFactor = wgpu::BlendFactor::Zero,
+            .dstFactor = wgpu::BlendFactor::One,
+        },
+    };
+
+    wgpu::ColorTargetState cts{
+        .format = surfaceFormat,
+        .blend = &bs,
+        .writeMask = wgpu::ColorWriteMask::All,
+    };
+
+    wgpu::FragmentState fs{
+        .module = shaderModule,
+        .entryPoint = "fs_main",
+        .constantCount = 0,
+        .constants = nullptr,
+        .targetCount = 1,
+        .targets = &cts,
+    };
+
+    wgpu::RenderPipelineDescriptor desc{
+        .vertex = vs,
+        .primitive = ps,
+        .depthStencil = nullptr,
+        .multisample{
+            .count = 1,
+            .mask = ~0u,
+            .alphaToCoverageEnabled = false,
+        },
+        .fragment = &fs,
+    };
+    pipeline = device.CreateRenderPipeline(&desc);
 }
