@@ -1,6 +1,0 @@
-[submodule "dawn"]
-	path = dawn
-	url = https://dawn.googlesource.com/dawn
-[submodule "glfw3webgpu"]
-	path = glfw3webgpu
-	url = https://github.com/eliemichel/glfw3webgpu.git
