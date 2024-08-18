@@ -10,7 +10,7 @@
 #include <fstream>
 #include <gsl/util>
 #include <iostream>
-#include <ranges>
+#include <numeric>
 #include <stdexcept>
 #include <vector>
 
@@ -123,8 +123,8 @@ void App::run() {
 }
 
 void App::fillAndCopyBuffers() {
-    using namespace std::ranges;
-    auto numbers = views::iota(0u, 16u) | to<std::vector<uint8_t>>();
+    std::vector<uint8_t> numbers(16);
+    std::iota(numbers.begin(), numbers.end(), 0);
     assert(numbers.size() == 16u);
     queue.WriteBuffer(buffer_1, 0, numbers.data(), numbers.size());
 
@@ -138,15 +138,11 @@ void App::fillAndCopyBuffers() {
                                             &debug_callbacks::mapAsyncStatus);
     instance.WaitAny(future, UINT64_MAX);
 
-    const uint8_t* result_ptr =
+    const uint8_t* result =
         static_cast<const uint8_t*>(buffer_2.GetConstMappedRange(0, 16));
-    for_each(std::span(result_ptr, 16) | views::enumerate,
-             [](auto tup) -> void {
-                 long idx;
-                 uint8_t val;
-                 std::tie(idx, val) = tup;
-                 fmt::println("Result[{}] = {}", idx, val);
-             });
+    for (size_t i = 0; i < 16; i++) {
+        fmt::println("result[{}] = {}", i, result[i]);
+    };
 }
 
 // ReSharper disable once CppMemberFunctionMayBeStatic
