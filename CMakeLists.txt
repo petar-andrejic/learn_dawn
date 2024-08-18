@@ -4,6 +4,7 @@ project(hello_webgpu
         VERSION 0.1.0
         LANGUAGES CXX C
 )
+set(DAWN_FETCH_DEPENDENCIES CACHE STRING ON)
 add_subdirectory(dawn)
 include(cmake/CPM.cmake)
 
