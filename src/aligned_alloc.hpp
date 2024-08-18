@@ -1,6 +1,7 @@
 // Credit to user https://stackoverflow.com/users/2191065/mxmlnkn
-// https:// stackoverflow.com/a/70994249
-// CC BY-SA 4.0
+// https://stackoverflow.com/a/70994249
+// Original implementation licensed under CC BY-SA 4.0
+// <http://creativecommons.org/licenses/by-sa/4.0/>.
 #pragma once
 #include <limits>
 #include <new>
