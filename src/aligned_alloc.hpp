@@ -67,4 +67,4 @@ class AlignedAllocator {
 };
 
 template <typename T>
-using Vector = std::vector<T, AlignedAllocator<T>>;
+using alignedVector = std::vector<T, AlignedAllocator<T>>;

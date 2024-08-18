@@ -14,7 +14,7 @@ inline constexpr size_t align4(const size_t& sz) {
 
 struct App {
    private:
-    gsl::final_action<void (*)()> cleanupGLFW;
+    gsl::final_action<void (*)()> onDestroy;
 
    public:
     std::shared_ptr<GLFWwindow> window;
@@ -27,8 +27,8 @@ struct App {
     wgpu::ShaderModule shaderModule;
     wgpu::RenderPipeline pipeline;
 
-    const static Vector<float> vertexData;
-    const static Vector<uint16_t> indexData;
+    const static alignedVector<float> vertexData;
+    const static alignedVector<uint16_t> indexData;
 
     // buffers
     wgpu::Buffer vertexBuffer, indexBuffer;
@@ -41,7 +41,7 @@ struct App {
     void initGLFW();
     App(int width, int height);
 
-    ~App();
+    ~App() noexcept;
 
     void run();
 

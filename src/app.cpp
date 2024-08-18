@@ -59,7 +59,7 @@ void App::initGLFW() {
 }
 
 App::App(const int width, const int height)
-    : cleanupGLFW(&glfwTerminate), width(width), height(height) {
+    : onDestroy(&glfwTerminate), width(width), height(height) {
     initGLFW();
     initWebGPU();
     configureSurface();
@@ -67,13 +67,13 @@ App::App(const int width, const int height)
     createRenderPipeline();
 }
 
-App::~App() {
+App::~App() noexcept {
     surface.Unconfigure();
 }
 
 // clang-format off
 
-const Vector<float> App::vertexData {
+const alignedVector<float> App::vertexData {
     // x,    y,       r,   g,   b,
     -0.5, -0.5,       1.0, 0.0, 0.0,
     //
@@ -84,7 +84,7 @@ const Vector<float> App::vertexData {
     -0.5, +0.5,       1.0, 1.0, 1.0,
 };
 
-const Vector<uint16_t> App::indexData {
+const alignedVector<uint16_t> App::indexData {
     0, 1, 2,
     0, 2, 3,
 };
