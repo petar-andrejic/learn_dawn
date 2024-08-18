@@ -20,6 +20,10 @@ struct App {
     wgpu::ShaderModule shaderModule;
     wgpu::RenderPipeline pipeline;
 
+    // buffers
+    wgpu::Buffer buffer_1;
+    wgpu::Buffer buffer_2;
+
     unsigned int width, height;
 
     void createSurface();
@@ -41,7 +45,11 @@ struct App {
 
     void createRenderPipeline();
 
+    void initBuffers();
+
     void render(const wgpu::TextureView& targetView);
+
+    void fillAndCopyBuffers();
 
     void configureSurface();
 

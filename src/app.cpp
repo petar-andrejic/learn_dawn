@@ -4,14 +4,18 @@
 // their pointers don't change, which isn't always desirable
 #include "app.hpp"
 
+#include <algorithm>
 #include <climits>
 #include <cstdint>
 #include <fstream>
 #include <gsl/util>
 #include <iostream>
+#include <ranges>
 #include <stdexcept>
+#include <vector>
 
 #include <GLFW/glfw3.h>
+#include <fmt/base.h>
 #include <fmt/format.h>
 #include <glfw3webgpu.h>
 #include <webgpu/webgpu.h>
@@ -43,6 +47,7 @@ void App::initWebGPU() {
     createSurface();
     requestAdapter();
     requestDeviceAndQueue();
+    initBuffers();
 }
 
 void App::initGLFW() {
@@ -106,6 +111,7 @@ void App::render(const wgpu::TextureView& targetView) {
 }
 
 void App::run() {
+    fillAndCopyBuffers();
     while (!glfwWindowShouldClose(window.get())) {
         glfwPollEvents();
         wgpu::TextureView targetView = getNextTextureView();
@@ -115,10 +121,36 @@ void App::run() {
     }
 }
 
-void
+void App::fillAndCopyBuffers() {
+    using namespace std::ranges;
+    auto numbers = views::iota(0u, 16u) | to<std::vector<uint8_t>>();
+    assert(numbers.size() == 16u);
+    queue.WriteBuffer(buffer_1, 0, numbers.data(), numbers.size());
+
+    wgpu::CommandEncoder commandEncoder = device.CreateCommandEncoder();
+    commandEncoder.CopyBufferToBuffer(buffer_1, 0, buffer_2, 0, 16);
+    wgpu::CommandBuffer command = commandEncoder.Finish();
+    queue.Submit(1, &command);
+
+    wgpu::Future future = buffer_2.MapAsync(wgpu::MapMode::Read, 0, 16,
+                                            wgpu::CallbackMode::WaitAnyOnly,
+                                            &debug_callbacks::mapAsyncStatus);
+    instance.WaitAny(future, UINT64_MAX);
+
+    const uint8_t* result_ptr =
+        static_cast<const uint8_t*>(buffer_2.GetConstMappedRange(0, 16));
+    for_each(std::span(result_ptr, 16) | views::enumerate,
+             [](auto tup) -> void {
+                 long idx;
+                 uint8_t val;
+                 std::tie(idx, val) = tup;
+                 fmt::println("Result[{}] = {}", idx, val);
+             });
+}
+
 // ReSharper disable once CppMemberFunctionMayBeStatic
 // There's no point doing this outside of the constructor
-App::createInstance() {  // NOLINT(*-convert-member-functions-to-static)
+void App::createInstance() {  // NOLINT(*-convert-member-functions-to-static)
     wgpu::InstanceDescriptor desc{
         .features{
             .timedWaitAnyEnable = true,
@@ -219,6 +251,25 @@ void App::loadShaders() {
     };
 
     shaderModule = device.CreateShaderModule(&sm_desc);
+}
+
+void App::initBuffers() {
+    wgpu::BufferDescriptor desc_1{
+        .label = "Input Buffer",
+        .usage = wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::CopySrc,
+        .size = 16,
+        .mappedAtCreation = false,
+    };
+
+    wgpu::BufferDescriptor desc_2{
+        .label = "Output Buffer",
+        .usage = wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::MapRead,
+        .size = 16,
+        .mappedAtCreation = false,
+    };
+
+    buffer_1 = device.CreateBuffer(&desc_1);
+    buffer_2 = device.CreateBuffer(&desc_2);
 }
 
 wgpu::TextureView App::getNextTextureView() {
