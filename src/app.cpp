@@ -94,7 +94,8 @@ void App::render(const wgpu::TextureView& targetView) {
             wgpu::RenderPassEncoder renderPassEncoder =
                 commandEncoder.BeginRenderPass(&desc);
             renderPassEncoder.SetPipeline(pipeline);
-            renderPassEncoder.Draw(3, 1, 0, 0);
+            renderPassEncoder.SetVertexBuffer(0, vertexBuffer);
+            renderPassEncoder.Draw(vertexCount, 1, 0, 0);
             renderPassEncoder.End();
         }
         {
@@ -189,8 +190,25 @@ void App::requestAdapter() {
     }
 };
 
+wgpu::RequiredLimits App::getRequiredLimits() {
+    // wgpu::SupportedLimits supportedLimits;
+    // adapter.GetLimits(&supportedLimits);
+    wgpu::RequiredLimits requiredLimits{
+        .limits{
+            .maxVertexBuffers = 1,
+            .maxBufferSize = 6 * 2 * sizeof(float),
+            .maxVertexAttributes = 1,
+            .maxVertexBufferArrayStride = 2 * sizeof(float),
+        },
+    };
+    return requiredLimits;
+}
+
 void App::requestDeviceAndQueue() {
-    wgpu::DeviceDescriptor desc{};
+    wgpu::RequiredLimits limits = getRequiredLimits();
+    wgpu::DeviceDescriptor desc({
+        .requiredLimits = &limits,
+    });
 
     // ReSharper disable once CppParameterMayBeConst
     // ReSharper disable once CppPassValueParameterByConstReference
@@ -270,6 +288,16 @@ void App::initBuffers() {
 
     buffer_1 = device.CreateBuffer(&desc_1);
     buffer_2 = device.CreateBuffer(&desc_2);
+
+    wgpu::BufferDescriptor vertex_desc{
+        .label = "Vertex Buffer",
+        .usage = wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::Vertex,
+        .size = vertexData.size() * sizeof(float),
+        .mappedAtCreation = false,
+    };
+
+    vertexBuffer = device.CreateBuffer(&vertex_desc);
+    queue.WriteBuffer(vertexBuffer, 0, vertexData.data(), vertex_desc.size);
 }
 
 wgpu::TextureView App::getNextTextureView() {
@@ -293,13 +321,24 @@ wgpu::TextureView App::getNextTextureView() {
 }
 
 void App::createRenderPipeline() {
+    wgpu::VertexAttribute pos_attrib{
+        .format = wgpu::VertexFormat::Float32x2,
+        .offset = 0,
+        .shaderLocation = 0,
+    };
+    wgpu::VertexBufferLayout vbl{
+        .arrayStride = 2 * sizeof(float),
+        .stepMode = wgpu::VertexStepMode::Vertex,
+        .attributeCount = 1,
+        .attributes = &pos_attrib,
+    };
     wgpu::VertexState vs{
         .module = shaderModule,
         .entryPoint = "vs_main",
         .constantCount = 0,
         .constants = nullptr,
-        .bufferCount = 0,
-        .buffers = nullptr,
+        .bufferCount = 1,
+        .buffers = &vbl,
     };
 
     wgpu::PrimitiveState ps{
