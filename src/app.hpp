@@ -21,7 +21,7 @@ struct App {
     wgpu::ShaderModule shaderModule;
     wgpu::RenderPipeline pipeline;
 
-    constexpr static size_t vertexCount = 3;
+    constexpr static size_t vertexCount = 6;
     constexpr static size_t vertexStride = 2;
     constexpr static std::array<float, vertexCount * vertexStride> vertexData =
         {
@@ -32,7 +32,13 @@ struct App {
             +0.5, -0.5,
 
             // x2, y2
-            +0.0, +0.5};
+            +0.0, +0.5,
+            // Add a second triangle:
+            -0.55f, -0.5,
+            //
+            -0.05f, +0.5,
+            //
+            -0.55f, +0.5};
     // buffers
     wgpu::Buffer buffer_1;
     wgpu::Buffer buffer_2;
