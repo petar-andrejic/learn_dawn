@@ -6,6 +6,10 @@ project(hello_webgpu
 )
 set(DAWN_FETCH_DEPENDENCIES CACHE STRING ON)
 add_subdirectory(dawn)
+
+get_target_property(webgpu_target dawn::webgpu_dawn ALIASED_TARGET)
+add_library(webgpu ALIAS ${webgpu_target})
+
 include(cmake/CPM.cmake)
 
 CPMAddPackage("gh:Microsoft/GSL@4.0.0")
@@ -15,7 +19,6 @@ CPMAddPackage("gh:fmtlib/fmt#11.0.2")
 
 # find_package(Dawn REQUIRED)
 # find_package(glfw3 REQUIRED)
-
 add_executable(App)
 add_custom_command(
         TARGET App POST_BUILD
@@ -29,6 +32,7 @@ set_target_properties(App PROPERTIES
         CXX_EXTENSIONS OFF
         COMPILE_WARNING_AS_ERROR ON
 )
+
 add_subdirectory(glfw3webgpu) # until https://github.com/glfw/glfw/pull/2333 is merged
 
 target_link_libraries(App PRIVATE dawn::webgpu_dawn glfw Microsoft.GSL::GSL fmt::fmt glfw3webgpu)
