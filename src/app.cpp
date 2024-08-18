@@ -71,6 +71,26 @@ App::~App() {
     surface.Unconfigure();
 }
 
+// clang-format off
+
+const Vector<float> App::vertexData {
+    // x,    y,       r,   g,   b,
+    -0.5, -0.5,       1.0, 0.0, 0.0,
+    //
+    +0.5, -0.5,       0.0, 1.0, 0.0,
+    //
+    +0.5, +0.5,       0.0, 0.0, 1.0,
+    //
+    -0.5, +0.5,       1.0, 1.0, 1.0,
+};
+
+const Vector<uint16_t> App::indexData {
+    0, 1, 2,
+    0, 2, 3,
+};
+
+// clang-format on
+
 void App::render(const wgpu::TextureView& targetView) {
     {
         wgpu::CommandEncoder commandEncoder = device.CreateCommandEncoder();
@@ -82,7 +102,7 @@ void App::render(const wgpu::TextureView& targetView) {
                     .resolveTarget = nullptr,
                     .loadOp = wgpu::LoadOp::Clear,
                     .storeOp = wgpu::StoreOp::Store,
-                    .clearValue = wgpu::Color{0.9, 0.1, 0.2, 1.0},
+                    .clearValue = wgpu::Color{0.5, 0.5, 0.5, 1.0},
                 },
             };
             wgpu::RenderPassDescriptor desc{
@@ -95,7 +115,9 @@ void App::render(const wgpu::TextureView& targetView) {
                 commandEncoder.BeginRenderPass(&desc);
             renderPassEncoder.SetPipeline(pipeline);
             renderPassEncoder.SetVertexBuffer(0, vertexBuffer);
-            renderPassEncoder.Draw(vertexCount, 1, 0, 0);
+            renderPassEncoder.SetIndexBuffer(indexBuffer,
+                                             wgpu::IndexFormat::Uint16);
+            renderPassEncoder.DrawIndexed(indexData.size(), 1, 0, 0, 0);
             renderPassEncoder.End();
         }
         {
@@ -112,7 +134,6 @@ void App::render(const wgpu::TextureView& targetView) {
 }
 
 void App::run() {
-    fillAndCopyBuffers();
     while (!glfwWindowShouldClose(window.get())) {
         glfwPollEvents();
         wgpu::TextureView targetView = getNextTextureView();
@@ -120,29 +141,6 @@ void App::run() {
             continue;
         render(targetView);
     }
-}
-
-void App::fillAndCopyBuffers() {
-    std::vector<uint8_t> numbers(16);
-    std::iota(numbers.begin(), numbers.end(), 0);
-    assert(numbers.size() == 16u);
-    queue.WriteBuffer(buffer_1, 0, numbers.data(), numbers.size());
-
-    wgpu::CommandEncoder commandEncoder = device.CreateCommandEncoder();
-    commandEncoder.CopyBufferToBuffer(buffer_1, 0, buffer_2, 0, 16);
-    wgpu::CommandBuffer command = commandEncoder.Finish();
-    queue.Submit(1, &command);
-
-    wgpu::Future future = buffer_2.MapAsync(wgpu::MapMode::Read, 0, 16,
-                                            wgpu::CallbackMode::WaitAnyOnly,
-                                            &debug_callbacks::mapAsyncStatus);
-    instance.WaitAny(future, UINT64_MAX);
-
-    const uint8_t* result =
-        static_cast<const uint8_t*>(buffer_2.GetConstMappedRange(0, 16));
-    for (size_t i = 0; i < 16; i++) {
-        fmt::println("result[{}] = {}", i, result[i]);
-    };
 }
 
 // ReSharper disable once CppMemberFunctionMayBeStatic
@@ -192,7 +190,7 @@ wgpu::RequiredLimits App::getRequiredLimits() {
     wgpu::RequiredLimits requiredLimits{
         .limits{
             .maxVertexBuffers = 1,
-            .maxBufferSize = vertexCount * vertexStride * sizeof(float),
+            .maxBufferSize = vertexData.size() * sizeof(float),
             .maxVertexAttributes = 2,
             .maxVertexBufferArrayStride = 2 * sizeof(float),
             .maxInterStageShaderComponents = 3,
@@ -269,32 +267,29 @@ void App::loadShaders() {
 }
 
 void App::initBuffers() {
-    wgpu::BufferDescriptor desc_1{
-        .label = "Input Buffer",
-        .usage = wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::CopySrc,
-        .size = 16,
-        .mappedAtCreation = false,
-    };
-
-    wgpu::BufferDescriptor desc_2{
-        .label = "Output Buffer",
-        .usage = wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::MapRead,
-        .size = 16,
-        .mappedAtCreation = false,
-    };
-
-    buffer_1 = device.CreateBuffer(&desc_1);
-    buffer_2 = device.CreateBuffer(&desc_2);
-
     wgpu::BufferDescriptor vertex_desc{
         .label = "Vertex Buffer",
         .usage = wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::Vertex,
-        .size = vertexData.size() * sizeof(float),
+        .size = align4(vertexData.size() * sizeof(float)),
         .mappedAtCreation = false,
     };
 
+    assert(vertex_desc.size = 120);
+
     vertexBuffer = device.CreateBuffer(&vertex_desc);
     queue.WriteBuffer(vertexBuffer, 0, vertexData.data(), vertex_desc.size);
+
+    wgpu::BufferDescriptor index_desc{
+        .label = "Index Buffer",
+        .usage = wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::Index,
+        .size = align4(indexData.size() * sizeof(uint16_t)),
+        .mappedAtCreation = false,
+    };
+
+    assert(index_desc.size == 12);
+
+    indexBuffer = device.CreateBuffer(&index_desc);
+    queue.WriteBuffer(indexBuffer, 0, indexData.data(), index_desc.size);
 }
 
 wgpu::TextureView App::getNextTextureView() {
@@ -318,22 +313,22 @@ wgpu::TextureView App::getNextTextureView() {
 }
 
 void App::createRenderPipeline() {
-    std::array<wgpu::VertexAttribute, 2> pos_attrib{
+    std::array<wgpu::VertexAttribute, 2> attribs{
         wgpu::VertexAttribute{
             .format = wgpu::VertexFormat::Float32x2,
             .offset = 0,
             .shaderLocation = 0,
-        },
+        },  // position
         wgpu::VertexAttribute{
             .format = wgpu::VertexFormat::Float32x3,
             .offset = 2 * sizeof(float),
             .shaderLocation = 1,
-        }};
+        }};  // colour
     wgpu::VertexBufferLayout vbl{
-        .arrayStride = vertexStride * sizeof(float),
+        .arrayStride = 5 * sizeof(float),
         .stepMode = wgpu::VertexStepMode::Vertex,
-        .attributeCount = pos_attrib.size(),
-        .attributes = pos_attrib.data(),
+        .attributeCount = attribs.size(),
+        .attributes = attribs.data(),
     };
     wgpu::VertexState vs{
         .module = shaderModule,

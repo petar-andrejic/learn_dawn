@@ -6,6 +6,12 @@
 #include <GLFW/glfw3.h>
 #include <webgpu/webgpu_cpp.h>
 
+#include "aligned_alloc.hpp"
+
+inline constexpr size_t align4(const size_t& sz) {
+    return (sz + 3) & ~3;
+};
+
 struct App {
    private:
     gsl::final_action<void (*)()> cleanupGLFW;
@@ -21,28 +27,11 @@ struct App {
     wgpu::ShaderModule shaderModule;
     wgpu::RenderPipeline pipeline;
 
-    constexpr static size_t vertexCount = 6;
-    constexpr static size_t vertexStride = 5;
-    constexpr static std::array<float, vertexCount * vertexStride> vertexData =
-        {
-            // x0,  y0,  r0,  g0,  b0
-            -0.5, -0.5, 1.0, 0.0, 0.0,
+    const static Vector<float> vertexData;
+    const static Vector<uint16_t> indexData;
 
-            // x1,  y1,  r1,  g1,  b1
-            +0.5, -0.5, 0.0, 1.0, 0.0,
-
-            // ...
-            +0.0, +0.5, 0.0, 0.0, 1.0,
-            //
-            -0.55f, -0.5, 1.0, 1.0, 0.0,
-            //
-            -0.05f, +0.5, 1.0, 0.0, 1.0,
-            //
-            -0.55f, +0.5, 0.0, 1.0, 1.0};
     // buffers
-    wgpu::Buffer buffer_1;
-    wgpu::Buffer buffer_2;
-    wgpu::Buffer vertexBuffer;
+    wgpu::Buffer vertexBuffer, indexBuffer;
 
     unsigned int width, height;
 
@@ -70,8 +59,6 @@ struct App {
     void initBuffers();
 
     void render(const wgpu::TextureView& targetView);
-
-    void fillAndCopyBuffers();
 
     void configureSurface();
 
