@@ -4,7 +4,7 @@ project(learn_dawn
         VERSION 0.1.0
         LANGUAGES CXX C
 )
-set(DAWN_FETCH_DEPENDENCIES CACHE STRING ON)
+set(dawn_DAWN_FETCH_DEPENDENCIES CACHE STRING ON)
 add_subdirectory(dawn)
 
 
