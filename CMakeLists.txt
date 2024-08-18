@@ -1,24 +1,19 @@
 cmake_minimum_required(VERSION 3.13)
 
-project(hello_webgpu
+project(learn_dawn
         VERSION 0.1.0
         LANGUAGES CXX C
 )
 set(DAWN_FETCH_DEPENDENCIES CACHE STRING ON)
 add_subdirectory(dawn)
 
-get_target_property(webgpu_target dawn::webgpu_dawn ALIASED_TARGET)
-add_library(webgpu ALIAS ${webgpu_target})
+
 
 include(cmake/CPM.cmake)
 
 CPMAddPackage("gh:Microsoft/GSL@4.0.0")
 CPMAddPackage("gh:fmtlib/fmt#11.0.2")
-# CPMAddPackage("gh:glfw/glfw#3.4")
-# CPMAddPackage("gh:google/dawn#main")
 
-# find_package(Dawn REQUIRED)
-# find_package(glfw3 REQUIRED)
 add_executable(App)
 add_custom_command(
         TARGET App POST_BUILD
@@ -33,6 +28,8 @@ set_target_properties(App PROPERTIES
         COMPILE_WARNING_AS_ERROR ON
 )
 
+get_target_property(webgpu_target dawn::webgpu_dawn ALIASED_TARGET)
+add_library(webgpu ALIAS ${webgpu_target}) # required alias for below
 add_subdirectory(glfw3webgpu) # until https://github.com/glfw/glfw/pull/2333 is merged
 
 target_link_libraries(App PRIVATE dawn::webgpu_dawn glfw Microsoft.GSL::GSL fmt::fmt glfw3webgpu)
