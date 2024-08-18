@@ -196,9 +196,10 @@ wgpu::RequiredLimits App::getRequiredLimits() {
     wgpu::RequiredLimits requiredLimits{
         .limits{
             .maxVertexBuffers = 1,
-            .maxBufferSize = 6 * 2 * sizeof(float),
-            .maxVertexAttributes = 1,
+            .maxBufferSize = vertexCount * vertexStride * sizeof(float),
+            .maxVertexAttributes = 2,
             .maxVertexBufferArrayStride = 2 * sizeof(float),
+            .maxInterStageShaderComponents = 3,
         },
     };
     return requiredLimits;
@@ -321,16 +322,22 @@ wgpu::TextureView App::getNextTextureView() {
 }
 
 void App::createRenderPipeline() {
-    wgpu::VertexAttribute pos_attrib{
-        .format = wgpu::VertexFormat::Float32x2,
-        .offset = 0,
-        .shaderLocation = 0,
-    };
+    std::array<wgpu::VertexAttribute, 2> pos_attrib{
+        wgpu::VertexAttribute{
+            .format = wgpu::VertexFormat::Float32x2,
+            .offset = 0,
+            .shaderLocation = 0,
+        },
+        wgpu::VertexAttribute{
+            .format = wgpu::VertexFormat::Float32x3,
+            .offset = 2 * sizeof(float),
+            .shaderLocation = 1,
+        }};
     wgpu::VertexBufferLayout vbl{
-        .arrayStride = 2 * sizeof(float),
+        .arrayStride = vertexStride * sizeof(float),
         .stepMode = wgpu::VertexStepMode::Vertex,
-        .attributeCount = 1,
-        .attributes = &pos_attrib,
+        .attributeCount = pos_attrib.size(),
+        .attributes = pos_attrib.data(),
     };
     wgpu::VertexState vs{
         .module = shaderModule,

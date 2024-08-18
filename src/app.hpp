@@ -22,23 +22,23 @@ struct App {
     wgpu::RenderPipeline pipeline;
 
     constexpr static size_t vertexCount = 6;
-    constexpr static size_t vertexStride = 2;
+    constexpr static size_t vertexStride = 5;
     constexpr static std::array<float, vertexCount * vertexStride> vertexData =
         {
-            // x0, y0
-            -0.5, -0.5,
+            // x0,  y0,  r0,  g0,  b0
+            -0.5, -0.5, 1.0, 0.0, 0.0,
 
-            // x1, y1
-            +0.5, -0.5,
+            // x1,  y1,  r1,  g1,  b1
+            +0.5, -0.5, 0.0, 1.0, 0.0,
 
-            // x2, y2
-            +0.0, +0.5,
-            // Add a second triangle:
-            -0.55f, -0.5,
+            // ...
+            +0.0, +0.5, 0.0, 0.0, 1.0,
             //
-            -0.05f, +0.5,
+            -0.55f, -0.5, 1.0, 1.0, 0.0,
             //
-            -0.55f, +0.5};
+            -0.05f, +0.5, 1.0, 0.0, 1.0,
+            //
+            -0.55f, +0.5, 0.0, 1.0, 1.0};
     // buffers
     wgpu::Buffer buffer_1;
     wgpu::Buffer buffer_2;
