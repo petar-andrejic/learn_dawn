@@ -6,7 +6,7 @@
 #include <GLFW/glfw3.h>
 #include <webgpu/webgpu_cpp.h>
 
-#include "aligned_alloc.hpp"
+#include "loader.hpp"
 
 constexpr auto align4(const size_t& size) -> size_t {
     return (size + 3U) & ~3U;
@@ -27,25 +27,7 @@ struct App {
     wgpu::ShaderModule shaderModule;
     wgpu::RenderPipeline pipeline;
 
-    // clang-format off
-
-    const alignedVector<float> vertexData {
-        // x,    y,       r,   g,   b,
-        -0.5, -0.5,       1.0, 0.0, 0.0,
-        //
-        +0.5, -0.5,       0.0, 1.0, 0.0,
-        //
-        +0.5, +0.5,       0.0, 0.0, 1.0,
-        //
-        -0.5, +0.5,       1.0, 1.0, 1.0,
-    };
-
-    const alignedVector<uint16_t> indexData {
-        0, 1, 2,
-        0, 2, 3,
-    };
-
-    // clang-format on
+    Data data;
 
     // buffers
     wgpu::Buffer vertexBuffer, indexBuffer;

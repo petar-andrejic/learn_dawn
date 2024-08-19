@@ -62,6 +62,7 @@ void App::initGLFW() {
 
 App::App(const wgpu::Extent2D& dims)
     : onDestroy(&glfwTerminate), dimensions(dims) {
+    data.load("./resources/data.txt");
     initGLFW();
     initWebGPU();
     configureSurface();
@@ -99,7 +100,7 @@ void App::render(const wgpu::TextureView& targetView) {
             renderPassEncoder.SetVertexBuffer(0, vertexBuffer);
             renderPassEncoder.SetIndexBuffer(indexBuffer,
                                              wgpu::IndexFormat::Uint16);
-            renderPassEncoder.DrawIndexed(indexData.size(), 1, 0, 0, 0);
+            renderPassEncoder.DrawIndexed(data.index.size(), 1, 0, 0, 0);
             renderPassEncoder.End();
         }
         {
@@ -172,9 +173,9 @@ wgpu::RequiredLimits App::getRequiredLimits() {
     wgpu::RequiredLimits requiredLimits{
         .limits{
             .maxVertexBuffers = 1,
-            .maxBufferSize = vertexData.size() * sizeof(float),
+            .maxBufferSize = data.maxBufferSize(),
             .maxVertexAttributes = 2,
-            .maxVertexBufferArrayStride = 2 * sizeof(float),
+            .maxVertexBufferArrayStride = 5 * sizeof(float),
             .maxInterStageShaderComponents = 3,
         },
     };
@@ -234,7 +235,7 @@ void App::configureSurface() {
 
 void App::loadShaders() {
     std::string tmp, shaderSource;
-    std::ifstream file("./shaders/shader.wgsl");
+    std::ifstream file("./resources/shader.wgsl");
     while (std::getline(file, tmp)) {
         shaderSource += tmp + "\n";
     }
@@ -252,26 +253,22 @@ void App::initBuffers() {
     wgpu::BufferDescriptor vertex_desc{
         .label = "Vertex Buffer",
         .usage = wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::Vertex,
-        .size = align4(vertexData.size() * sizeof(float)),
+        .size = align4(data.vertex.size() * sizeof(float)),
         .mappedAtCreation = false,
     };
 
-    assert(vertex_desc.size = 120);
-
     vertexBuffer = device.CreateBuffer(&vertex_desc);
-    queue.WriteBuffer(vertexBuffer, 0, vertexData.data(), vertex_desc.size);
+    queue.WriteBuffer(vertexBuffer, 0, data.vertex.data(), vertex_desc.size);
 
     wgpu::BufferDescriptor index_desc{
         .label = "Index Buffer",
         .usage = wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::Index,
-        .size = align4(indexData.size() * sizeof(uint16_t)),
+        .size = align4(data.index.size() * sizeof(uint16_t)),
         .mappedAtCreation = false,
     };
 
-    assert(index_desc.size == 12);
-
     indexBuffer = device.CreateBuffer(&index_desc);
-    queue.WriteBuffer(indexBuffer, 0, indexData.data(), index_desc.size);
+    queue.WriteBuffer(indexBuffer, 0, data.index.data(), index_desc.size);
 }
 
 wgpu::TextureView App::getNextTextureView() {

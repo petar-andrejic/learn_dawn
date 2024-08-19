@@ -18,8 +18,8 @@ add_executable(App)
 add_custom_command(
         TARGET App POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_directory
-        "${PROJECT_SOURCE_DIR}/shaders"
-        "${PROJECT_BINARY_DIR}/shaders"
+        "${PROJECT_SOURCE_DIR}/resources"
+        "${PROJECT_BINARY_DIR}/resources"
 )
 set_target_properties(App PROPERTIES
         CXX_STANDARD 17
