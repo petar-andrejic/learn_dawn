@@ -31,11 +31,13 @@ void App::createSurface() {
     surface = wgpu::Surface::Acquire(m_surface);
 }
 
-void App::createWindow(const int width, const int height) {
+void App::createWindow(const wgpu::Extent2D& dims) {
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-    glfwWindowHint(GLFW_RESIZABLE, false);
+    glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
     window = std::shared_ptr<GLFWwindow>(
-        glfwCreateWindow(width, height, "New Window", nullptr, nullptr),
+        glfwCreateWindow(static_cast<int>(dims.width),
+                         static_cast<int>(dims.height), "New Window", nullptr,
+                         nullptr),
         &glfwDestroyWindow);
     if (!window) {
         throw std::runtime_error("Failed to create window");
@@ -55,11 +57,11 @@ void App::initGLFW() {
         throw std::runtime_error("Failed to init GLFW");
     }
     glfwSetErrorCallback(&debug_callbacks::throwGLFW);
-    createWindow(static_cast<int>(width), static_cast<int>(height));
+    createWindow(dimensions);
 }
 
-App::App(const int width, const int height)
-    : onDestroy(&glfwTerminate), width(width), height(height) {
+App::App(const wgpu::Extent2D& dims)
+    : onDestroy(&glfwTerminate), dimensions(dims) {
     initGLFW();
     initWebGPU();
     configureSurface();
@@ -70,26 +72,6 @@ App::App(const int width, const int height)
 App::~App() noexcept {
     surface.Unconfigure();
 }
-
-// clang-format off
-
-const alignedVector<float> App::vertexData {
-    // x,    y,       r,   g,   b,
-    -0.5, -0.5,       1.0, 0.0, 0.0,
-    //
-    +0.5, -0.5,       0.0, 1.0, 0.0,
-    //
-    +0.5, +0.5,       0.0, 0.0, 1.0,
-    //
-    -0.5, +0.5,       1.0, 1.0, 1.0,
-};
-
-const alignedVector<uint16_t> App::indexData {
-    0, 1, 2,
-    0, 2, 3,
-};
-
-// clang-format on
 
 void App::render(const wgpu::TextureView& targetView) {
     {
@@ -243,8 +225,8 @@ void App::configureSurface() {
         .viewFormatCount = 0,
         .viewFormats = nullptr,
         .alphaMode = wgpu::CompositeAlphaMode::Auto,
-        .width = width,
-        .height = height,
+        .width = dimensions.width,
+        .height = dimensions.height,
         .presentMode = wgpu::PresentMode::Fifo,
     };
     surface.Configure(&config);

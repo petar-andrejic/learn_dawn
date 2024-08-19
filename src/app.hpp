@@ -8,8 +8,8 @@
 
 #include "aligned_alloc.hpp"
 
-inline constexpr size_t align4(const size_t& sz) {
-    return (sz + 3) & ~3;
+constexpr auto align4(const size_t& size) -> size_t {
+    return (size + 3U) & ~3U;
 };
 
 struct App {
@@ -27,21 +27,48 @@ struct App {
     wgpu::ShaderModule shaderModule;
     wgpu::RenderPipeline pipeline;
 
-    const static alignedVector<float> vertexData;
-    const static alignedVector<uint16_t> indexData;
+    // clang-format off
+
+    const alignedVector<float> vertexData {
+        // x,    y,       r,   g,   b,
+        -0.5, -0.5,       1.0, 0.0, 0.0,
+        //
+        +0.5, -0.5,       0.0, 1.0, 0.0,
+        //
+        +0.5, +0.5,       0.0, 0.0, 1.0,
+        //
+        -0.5, +0.5,       1.0, 1.0, 1.0,
+    };
+
+    const alignedVector<uint16_t> indexData {
+        0, 1, 2,
+        0, 2, 3,
+    };
+
+    // clang-format on
 
     // buffers
     wgpu::Buffer vertexBuffer, indexBuffer;
 
-    unsigned int width, height;
+    wgpu::Extent2D dimensions;
 
     void createSurface();
-    void createWindow(int width, int height);
+    void createWindow(const wgpu::Extent2D& dims);
     void initWebGPU();
     void initGLFW();
-    App(int width, int height);
-
+    App(const wgpu::Extent2D& dims);
     ~App() noexcept;
+
+    App(const App& other) = delete;
+    App(App&& other) noexcept = default;
+
+    auto operator=(App&& other) noexcept -> App& {
+        using std::swap;
+        swap(*this, other);
+        return *this;
+    }
+
+    auto operator=(const App& other) -> App& = delete;
 
     void run();
 
@@ -50,7 +77,7 @@ struct App {
 
     void requestAdapter();
 
-    wgpu::RequiredLimits getRequiredLimits();
+    auto getRequiredLimits() -> wgpu::RequiredLimits;
 
     void requestDeviceAndQueue();
 
@@ -64,5 +91,5 @@ struct App {
 
     void loadShaders();
 
-    wgpu::TextureView getNextTextureView();
+    auto getNextTextureView() -> wgpu::TextureView;
 };
