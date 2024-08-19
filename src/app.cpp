@@ -62,7 +62,7 @@ void App::initGLFW() {
 
 App::App(const wgpu::Extent2D& dims)
     : onDestroy(&glfwTerminate), dimensions(dims) {
-    data.load("./resources/data.txt");
+    data.load(RESOURCE_DIR "/data.txt");
     initGLFW();
     initWebGPU();
     configureSurface();
@@ -235,7 +235,7 @@ void App::configureSurface() {
 
 void App::loadShaders() {
     std::string tmp, shaderSource;
-    std::ifstream file("./resources/shader.wgsl");
+    std::ifstream file(RESOURCE_DIR "/shader.wgsl");
     while (std::getline(file, tmp)) {
         shaderSource += tmp + "\n";
     }
