@@ -5,9 +5,9 @@
 namespace debug_callbacks {
 void onDeviceLost(WGPUDeviceLostReason reason, const char* message, void*);
 
-void uncapturedError(WGPUErrorType err, const char* message, void*);
+void onUncapturedError(WGPUErrorType err, const char* message, void*);
 
-void throwGLFW(int err, const char* message);
+void logGLFW(int err, const char* message);
 
-void mapAsyncStatus(wgpu::MapAsyncStatus status, const char* message);
+void onMapAsync(wgpu::MapAsyncStatus status, const char* message);
 }  // namespace debug_callbacks

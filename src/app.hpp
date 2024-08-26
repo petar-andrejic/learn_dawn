@@ -25,12 +25,13 @@ struct App {
     wgpu::Device device;
     wgpu::Queue queue;
     wgpu::ShaderModule shaderModule;
+    wgpu::BindGroup bindGroup;
     wgpu::RenderPipeline pipeline;
 
     Data data;
 
     // buffers
-    wgpu::Buffer vertexBuffer, indexBuffer;
+    wgpu::Buffer vertexBuffer, indexBuffer, uniformBuffer;
 
     wgpu::Extent2D dimensions;
 

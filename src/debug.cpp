@@ -24,27 +24,25 @@ void onDeviceLost(WGPUDeviceLostReason reason, const char* _message, void*) {
             return;
         }
         default: {
-            throw std::runtime_error(fmt::format("webGPU device lost {}: {}",
-                                                 static_cast<int>(reason),
-                                                 message));
+            fmt::println("webGPU device lost {}: {}", static_cast<int>(reason),
+                         message);
+            return;
         }
     }
 };
 
-void uncapturedError(WGPUErrorType err, const char* _message, void*) {
+void onUncapturedError(WGPUErrorType err, const char* _message, void*) {
     std::string message = _message ? _message : "";
-    throw std::runtime_error(fmt::format("Uncaptured webGPU error {}: {}",
-                                         static_cast<int>(err), message));
+    fmt::println("Uncaptured webGPU error {}: {}", static_cast<int>(err),
+                 message);
 };
 
-void throwGLFW(int err, const char* _message) {
+void logGLFW(int err, const char* _message) {
     std::string message = _message ? _message : "";
-
-    throw std::runtime_error(
-        fmt::format("GLFW return error {}: {}", err, message));
+    fmt::println("GLFW returned error {}: {}", err, message);
 };
 
-void mapAsyncStatus(wgpu::MapAsyncStatus status, const char* _message) {
+void onMapAsync(wgpu::MapAsyncStatus status, const char* _message) {
     std::string message = _message ? _message : "";
     using Status = wgpu::MapAsyncStatus;
     switch (status) {
@@ -57,20 +55,17 @@ void mapAsyncStatus(wgpu::MapAsyncStatus status, const char* _message) {
             return;
         }
         case Status::Error: {
-            const std::string msg =
-                fmt::format("Operation returned error {}: {}",
-                            static_cast<size_t>(status), message);
-            throw std::runtime_error(msg);
+            fmt::println(stderr, "Operation returned error {}: {}",
+                         static_cast<int>(status), message);
+            return;
         }
         case Status::InstanceDropped: {
-            const std::string msg = fmt::format(
-                "Operation aborted due to instance drop: {}", message);
-            throw std::runtime_error(msg);
+            fmt::println("Operation aborted due to instance drop: {}", message);
+            return;
         }
         default: {
-            const std::string msg = fmt::format(
-                "Operation aborted due to unkown error: {}", message);
-            throw std::runtime_error(msg);
+            fmt::println("Operation aborted due to unkown error: {}", message);
+            return;
         }
     }
 }
