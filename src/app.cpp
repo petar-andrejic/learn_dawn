@@ -117,7 +117,7 @@ void App::render(const wgpu::TextureView& targetView) {
     device.Tick();
 }
 
-void App::run() {
+void App::run() noexcept {
     while (!glfwWindowShouldClose(window.get())) {
         glfwPollEvents();
         wgpu::TextureView targetView = getNextTextureView();

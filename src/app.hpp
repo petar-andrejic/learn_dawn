@@ -53,7 +53,7 @@ struct App {
 
     auto operator=(const App& other) -> App& = delete;
 
-    void run();
+    void run() noexcept;
 
    private:
     void createInstance();
