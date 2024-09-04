@@ -415,6 +415,7 @@ void App::createRenderPipeline() {
     // END PIPELINE
 
     wgpu::RenderPipelineDescriptor desc{
+        .layout = pl,
         .vertex = vs,
         .primitive = ps,
         .depthStencil = nullptr,
@@ -424,7 +425,6 @@ void App::createRenderPipeline() {
             .alphaToCoverageEnabled = false,
         },
         .fragment = &fs,
-        .layout = pl,
     };
     pipeline = device.CreateRenderPipeline(&desc);
 }
